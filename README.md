@@ -14,5 +14,5 @@ https://www.youtube.com/watch?v=crlrz-Ks8DE&t=173s
 
 git pull --rebase origin main
 
-git push -u origin master
+git push -u origin main
 

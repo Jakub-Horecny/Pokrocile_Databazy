@@ -84,26 +84,6 @@ K ñ hodnota kreditov za konkrÈtny predmet
 Z ñ ËÌselnÈ vyjadrenie zn·mky za konkrÈtny predmet
 */
 
-select
-    z.ects * (case WHEN pr.forma_kont='s' and z.zapocet is null then 4 else 
-    decode(z.vysledok, 'A', 1, 'B', 1.5, 'C', 2, 'D', 2.5, 'E', 3, 'F', 4, NULL, 4) end)
-    / sum(ects
-   ; 
- 
--- vypÌöte ötudenta s maxim·lnim poËtom kreditov, ak je ich viac vypÌsaù vöetk˝ch   
- select
-    o.meno,
-    o.priezvisko,
-    s.os_cislo,
-    sum(case when z.vysledok in (NULL, 'F') then 0 else z.ects end) pocet
-from os_udaje o
-join student s on (s.rod_cislo = o.rod_cislo)
-join zap_predmety z on(s.os_cislo = z.os_cislo)
-group by o.meno,
-    o.priezvisko,
-    s.os_cislo
-;
-select * from zap_predmety;
 
 
 -- ===================== PRAKTICKE CVICENIE 5 ========================
@@ -351,3 +331,265 @@ select * from st_odbory
 where  not exists (select 'x' from student
                     where st_odbory.st_odbor = student.st_odbor
                             and st_odbory.st_zameranie = student.st_zameranie);
+                            
+                            
+
+-- ========== ULOHY 4 ==================
+-- 4.1
+--v·ûen˝ ötudijn˝ priemer:
+select os_cislo,skrok, (case when men = 0 then 9999 else cit/men end)as priemer from(
+    select os_cislo,skrok,sum(citatel)as cit, sum(menovatel) as men from (
+    select zp.os_cislo, zp.skrok,
+        zp.ects*(case when forma_kont='s' and zp.zapocet is null then
+             4
+        else
+            decode(vysledok,'A',1,'B',1.5,'C',2,'D',2.5,'E',3,4)
+        end) as citatel, zp.ects*(case when vysledok in ('A','B','C','D','E') then 1 else 0 end) as menovatel --*(case when vysledok in ('A','B','C','D','E') then 1 else 0 end)
+    from zap_predmety zp
+        join predmet_bod p on(zp.cis_predm = p.cis_predm)
+        where forma_kont in('e','s')   
+   ) 
+   group by os_cislo,skrok
+  )
+  order by os_cislo, skrok
+;
+ 
+-- 2.) select v selecte 
+-- vypÌöte ötudenta s maxim·lnim poËtom kreditov, ak je ich viac vypÌsaù vöetk˝ch   
+
+-- iba max
+select 
+    *
+from (
+    select
+        o.meno meno,
+        o.priezvisko priezvisko,
+        s.os_cislo os,
+        -- alebo takto? sum(case when z.vysledok in (NULL, 'F') then 0 else z.ects end) pocet
+        -- potom by to celÈ muslo Ìsù do -- order by SEM desc
+        sum(z.ects) pocet
+    from os_udaje o
+    join student s on (s.rod_cislo = o.rod_cislo)
+    join zap_predmety z on(s.os_cislo = z.os_cislo)
+    group by meno, priezvisko, s.os_cislo )
+group by meno, priezvisko, os, pocet    -- musÌ tam byù aj 'pocet' lebo dÙvody 
+having pocet = (select max(sum(ects)) from zap_predmety
+                    group by os_cislo); -- d· ich to viac, ak je ich viac  
+
+select max(sum(ects)) pocet  from zap_predmety
+                    group by os_cislo
+                    order by pocet;
+
+-- cez analytickÈ funkcie
+select 
+    *
+from (
+    select
+        o.meno,
+        o.priezvisko,
+        s.os_cislo,
+        -- alebo takto? sum(case when z.vysledok in (NULL, 'F') then 0 else z.ects end) pocet
+        -- potom by to celÈ muslo Ìsù do -- order by SEM desc
+        sum(z.ects) pocet,
+        rank() over (order by sum(z.ects) desc) rn -- musÌ tu byù rank(), aby to vypÌsalo viacer˝ch
+    from os_udaje o
+    join student s on (s.rod_cislo = o.rod_cislo)
+    join zap_predmety z on(s.os_cislo = z.os_cislo)
+    group by o.meno,
+        o.priezvisko,
+        s.os_cislo )
+where rn = 1 ; -- rn = 4 je ich viac 
+
+-- 3.) RANK VERZUS ROW_NUMBER   
+-- vypÌöte 30% najlepöÌch ötudentov podæa poËtu zÌskan˝ch kreditov s pouûitÌm ROW_NUMBER a RANK
+
+-- ROW_NUMBER
+select
+    *
+from (
+    select
+        o.meno meno,
+        o.priezvisko priezvisko,
+        s.os_cislo os_cislo,
+        sum(z.ects) pocet,
+        ROW_NUMBER() over (order by sum(z.ects) desc) rn
+    from os_udaje o
+    join student s on (s.rod_cislo = o.rod_cislo)
+    join zap_predmety z on (s.os_cislo = z.os_cislo)
+    group by o.meno, o.priezvisko, s.os_cislo)
+where rn <= (select count(*) from student)*0.3;
+
+-- RANK()
+select
+    *
+from (
+    select
+        o.meno meno,
+        o.priezvisko priezvisko,
+        s.os_cislo os_cislo,
+        sum(z.ects) pocet,
+        RANK() over (order by sum(z.ects) desc) rn
+    from os_udaje o
+    join student s on (s.rod_cislo = o.rod_cislo)
+    join zap_predmety z on (s.os_cislo = z.os_cislo)
+    group by o.meno, o.priezvisko, s.os_cislo)
+where rn <= (select count(*) from student)*0.3;
+
+-- 4 ötatistika
+-- vytvorte pohæad poc_st ötatistika zloûenia fakulti,
+-- riadky roËnÌm
+-- stÂpce - pracovisk·
+-- bunky - poËet ötudentov
+
+select
+    rocnik,
+    sum(case when substr(st_skupina,2,1) = 'P' then 1 else 0 end) PD,
+    sum(case when substr(st_skupina,2,1) = 'Z' then 1 else 0 end) ZA,
+    sum(case when substr(st_skupina,2,1) = 'R' then 1 else 0 end) MM
+from student
+group by rocnik
+order by rocnik;
+
+-- ========== 4.2 DOPLNUJUCE ZADANIA ==========
+
+-- 1.) RANDOM
+-- vytvorte funkciu daj_heslo(dlzka), ktor· vygeneruje heslo. Pouûite tabuæku na 
+-- vytvorenie mnoûiny znakov, z ktorej sa m· heslo generovaù 
+
+-- m·m to ch·paù tak ûe najskÙr treba vytvoriù tabuæku so znakmi, a potom z nej
+-- n·hodne vyberaù ?, a m·j˙ to byù iba ËÌsla alebo Ëo???
+
+create table znak (
+    id_znak integer NOT NULL PRIMARY KEY,
+    znak char(1) NOT NULL
+);
+
+drop table znak;
+insert into znak(id_znak, znak) values(1, 'a');
+insert into znak(id_znak, znak) values(2, 'B');
+insert into znak(id_znak, znak) values(3, 'c');
+insert into znak(id_znak, znak) values(4, 'd');
+insert into znak(id_znak, znak) values(5, 'E');
+insert into znak(id_znak, znak) values(6, 'F');
+insert into znak(id_znak, znak) values(7, 'g');
+insert into znak(id_znak, znak) values(8, 'H');
+insert into znak(id_znak, znak) values(9, 'X');
+insert into znak(id_znak, znak) values(10, 'Y');
+insert into znak(id_znak, znak) values(0, 'O');
+
+select count(*) from znak;
+
+-- ak v tabulke nebude znak z id_znak = 0, tak to nebude fungovaù dobre 
+create or replace function daj_heslo(dlzka integer)
+return varchar2
+as
+    max_id integer; 
+    heslo varchar2(100); -- chcel som tam daù dlzka ale nejde to 
+    temp_znak char(1);
+begin
+    select count(*) into max_id from znak;
+    -- prv˝ znak hesla
+    -- keÔ je heslo inicializovanÈ ako '', tak z toho vznikne null, lebo v oracle '' = NULL
+    select znak into heslo from znak
+            where id_znak = (select floor (DBMS_RANDOM.value*max_id) from dual);
+    
+    for i in 1..(dlzka-1)
+    loop
+        select znak into temp_znak from znak
+            where id_znak = (select floor (DBMS_RANDOM.value*max_id) from dual);
+        heslo := heslo || temp_znak;
+    end loop;
+    return heslo;
+end;
+/
+select daj_heslo(5) from dual;
+
+-- 2.)
+-- vytvorte kÛpiu tabuæky predmet_bod s d·tami skrok = 2008 z priklad_db2.predmet_bod.
+create table predmet_bod_copy as (select * from priklad_db2.predmet_bod
+                                    where skrok = 2008);
+select count(*) from priklad_db2.predmet_bod
+    where skrok = 2008; -- 314
+select count(*) from predmet_bod_copy; -- 314
+
+-- vygenerujte riadky do tabuæky predmet_bod na rok 2009, priËom predmet BA06 sa neotv·ra
+select * from priklad_db2.predmet_bod
+    order by skrok desc;
+
+select count(*) from predmet_bod where skrok=2009; --181
+-- ja uû tam m·m 2009, preto to urobÌm pre 2010
+
+select * from predmet_bod;
+
+-- bez where, ale s˙ tam iba riadky ktorÈ spÂnaj˙ podmienku 
+select 'insert into predmet_bod values(''' || cis_predm || ''',''' 
+                                            || 2010 || ''',''' 
+                                            || garant || ''','''
+                                            || ects || ''','''
+                                            || semester || ''','''
+                                            || forma_kont || ''');'
+from predmet_bod where skrok=2009 and cis_predm <> 'BA06';
+
+-- podmienka where je v retazci ale takto to asi nem· byù 
+select 'insert into predmet_bod values(''' || cis_predm || ''',''' 
+                                            || 2010 || ''',''' 
+                                            || garant || ''','''
+                                            || ects || ''','''
+                                            || semester || ''','''
+                                            || forma_kont || ''')' 
+                                            || ' from predmet_bod where skrok=2009 and cis_predm <> ' || '''BA06''' || ';'
+from predmet_bod where skrok=2009 and cis_predm <> 'BA06';
+
+-- vzor z prektickÈho cviËenia 
+select 'insert into predmety_zaloha values(''' || cis_predm || ''',''' || nazov || ''');'
+from predmet;
+
+
+-- 3.)
+-- Zmente poËet kreditov v ök.roku 2008 v tabuæke zap_redmety podæa tabuæky 
+-- priklad_db2.predmet_bod(ects)
+select * from priklad_db2.predmet_bod
+    where skrok = 2008; -- 314
+    
+select * from predmet_bod
+    where skrok = 2008; -- 6
+    
+/*
+BI01	2008	KI001	6	Z	s
+BA10	2008	KMM01	6	L	s
+BI23	2008	EX001	5	Z	s
+BI03	2008	KI001	6	Z	s
+BI02	2008	KI001	6	L	s
+BI11	2008	EX002	1	Z	z
+*/
+-- prejdem t˝ch 6 riadkov a upravÌm to 
+update predmet_bod p1 set 
+p1.ects=(select ects from priklad_db2.predmet_bod p2
+            where p1.cis_predm = p2.cis_predm
+                and p2.skrok = 2008)
+where p1.skrok=2008;
+
+-- na test, lebo po UPDATE som mal rovnakÈ hodnoty kreditov
+update predmet_bod set ects=50 where cis_predm = 'BI01' and skrok = 2008;
+
+rollback;
+
+
+select * from priklad_db2.predmet_bod;
+
+-- 4 zmente rodnÈ ËÌslo ötudentke z 755022/8569 na 755122/8569
+-- tak˙ tam nem·m, takûe to bude 850130/3695 na 851130/3695
+
+-- spravÌm to cez triger
+create or replace trigger trig_upd_rod_cislo_student
+    before update on student -- je jedno Ëi BEFORE alebo AFTER 
+for each row
+begin
+    update os_udaje set rod_cislo=:new.rod_cislo where rod_cislo=:old.rod_cislo;
+end;
+/
+
+update student set rod_cislo = '851130/3695' where rod_cislo = '850130/3695';
+rollback;
+
+select * from student order by rod_cislo;

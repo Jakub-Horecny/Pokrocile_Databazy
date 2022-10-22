@@ -33,6 +33,7 @@ insert into zamestnanci values('123456/1234', 'Jakub', 'Horecny', 42, 'sef');
 insert into zamestnanci values(t_zam('123456/1234', 'Jakub', 'Horecny', 42, 'sef'));
 
 select * from zamestnanci;
+select rc, meno from zamestnanci;
 
 drop table zamestnanci;
 drop type t_zam;
@@ -151,12 +152,14 @@ group by m.n_mesta;
 -- 43.)
 -- VypÌöte 5% obyvateæov s najv‰ËöÌmi odvodmi do poisùovne pre kaûdÈ mesto osobitne.
 select
+    mesto,
     meno,
     priezvisko,
     rod_cislo,
     suma
 from
     (select
+        m.n_mesta mesto,
         o.meno meno,
         o.priezvisko priezvisko,
         o.rod_cislo rod_cislo,
@@ -166,10 +169,10 @@ from
     join p_osoba o on(m.psc = o.psc)
     join p_poistenie po on(po.rod_cislo = o.rod_cislo)
     join p_odvod_platba od on(od.id_poistenca = po.id_poistenca)
-    group by o.meno, o.priezvisko, o.rod_cislo, od.suma
+    group by o.meno, o.priezvisko, o.rod_cislo, od.suma, m.n_mesta
     )
 having rn <= ceil((select count(*) from p_odvod_platba)*0.05)
-group by meno, priezvisko, rod_cislo,rn,suma;
+group by meno, priezvisko, rod_cislo,rn,suma, mesto;
     
 
 SELECT mesto, meno, priezvisko FROM
@@ -200,6 +203,18 @@ where to_date(substr(za.rod_cislo,1,2) || '.' ||
     and
         p.oslobodeny in ('n','N')
 group by z.nazov;
+
+
+--13. K jednotliv˝m zamestn·vateæom vypÌöte poËet zamestnancov a samoplatcov do 4O rokov
+select 
+    nazov, 
+    sum(case when id_platitela = rod_cislo then 1 else 0 end) samoplatca,
+    sum(case when id_platitela = id_zamestnavatela then 1 else 0 end) zamestnanec
+from p_zamestnavatel zl
+join p_zamestnanec zc on(zc.id_zamestnavatela = zl.ICO)
+join p_poistenie using(rod_cislo)
+where to_number(substr(rod_cislo,1,2)) <= extract(year from sysdate)-40
+group by nazov;
 
 -- 24.)
 -- Pre jednotlivÈ rozp‰tia s˙m 0 - 2000, 2001-40000,40001 - 80000 
@@ -346,12 +361,147 @@ from (
     join p_zamestnanec z on(za.ico = z.id_zamestnavatela)
     join p_poistenie p on (p.rod_cislo = z.rod_cislo)
     join p_odvod_platba o on (o.id_poistenca = p.id_poistenca)
-    where extract(year from dat_platby) = extract(year from sysdate) - 1
+    where extract(year from dat_platby) = extract(year from sysdate) - 6
     group by za.ico, za.nazov, z.rod_cislo, o.suma, p.id_poistenca
     )
 where rn <= 3
 group by  nazov, rn, rod_cislo
 order by nazov, rn;
+
+-- 40.)
+-- pomocou SQL vygenerujte prÌzak na zamknutie kont vöetk˝ch ötudentov, ktor˝ nemaj˙ zapÌsan˝ predmet 
+-- v ök. roku 2005 (pomocou tabuæky zoznam a systÈmovej tabuæky all_users) 
+-- syntax prÌkazu: alter user login account lock;
+
+select 'alter user ' || login || ' account lock;'
+from zoznam
+where not exists (select 'x' from zoznam where skrok<>'2005');-- nieËo tu je zle ale neviem Ëo 
+
+-- 42.)
+-- VypÌöte n·zvy typov prÌspevkov, ktorÈ NEBOLI vypl·canÈ minul˝ kalend·rny mesiac. 
+-- PouËite EXISTS
+
+-- -71 nieËo vypÌöe 
+select
+    t.id_typu,
+    t.popis
+from p_typ_prispevku t
+where not exists (select 'x' from p_prispevky
+                  where t.id_typu = id_typu
+                and extract(month from kedy) = extract(month from (add_months(sysdate,-71))));
+
+-- ==================== TEST 3 ====================
+
+-- 40.)
+-- pre jednotlivÈ rozpetie s˙m 0-2000, 2001-40000, 40001-80000 vypÌöte percentu·lne
+-- rozloûenie osÙb, ktorÌ t˙to Ëiastku celkovo odviedli do poistovne a s˙ z okresu éilina 
+
+select
+    round(sum(case when suma >= 0 and suma <= 2000 then 1 else 0 end)
+        /count(suma)*100,2) s_0_2000,
+    round(sum(case when suma > 2000 and suma <= 40000 then 1 else 0 end)
+        /count(suma)*100,2) s_2001_40000,
+    round(sum(case when suma > 40000 then 1 else 0 end)
+        /count(suma)*100,2)s_40001_80000
+from (
+-- tu som pre jednotliv˝ch poistencov zistil koæko odviedli 
+select
+    po.id_poistenca poistenec,
+    sum(od.suma) suma
+from p_okres ok
+join p_mesto m on(ok.id_okresu = m.id_okresu)
+join p_osoba o on(o.psc = m.psc)
+join p_poistenie po on (po.rod_cislo = o.rod_cislo)
+join p_odvod_platba od on (od.id_poistenca = po.id_poistenca)
+where ok.id_okresu = 'ZA'
+group by po.id_poistenca);
+
+-- 42.)
+-- vypÌsaù 5% obyvateæov s najv‰ËöÌmi odvodmi do poiùovne pre kaûdÈ mesot osobitne
+-- nefunguje dobre 
+select 
+    *
+from
+    (select 
+        m.psc psc,
+        m.n_mesta mesto,
+        p.id_poistenca poistenec, 
+        row_number() over (partition by m.n_mesta order by sum(od.suma) desc) rn
+    from p_mesto m
+    join p_osoba o on (m.psc = o.psc)
+    join p_poistenie p on (o.rod_cislo = p.rod_cislo)
+    join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
+    group by m.psc, m.n_mesta, p.id_poistenca, p.rod_cislo) -- neviem Ëi aj podæa o.rod_cislo
+where rn <= ceil((select count(*) 
+                    from p_osoba 
+                    where p_osoba.psc = psc)*0.05)    
+group by mesto, poistenec, rn, psc
+order by mesto, rn;
+
+-- iba 5% obyvateæov s najv‰ËöÌmi dovodmi 
+select 
+    *
+from 
+    (select
+        o.meno meno,
+        o.priezvisko priezvisko,
+        o.rod_cislo rod_cislo,
+        sum(od.suma) suma,
+        row_number() over (order by sum(od.suma) desc) rn
+    from p_osoba o
+    join p_poistenie p on (o.rod_cislo = p.rod_cislo)
+    join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
+    group by o.meno, o.priezvisko, o.rod_cislo)
+where rn <= ceil((select count(*) from p_osoba)*0.05)
+order by rn;
+
+-- ================ TEST 4 ===================
+
+-- 23.)
+-- vypÌöte zamestn·vateæov od 6 po 12 miesto na z·klade CELKOVEJ odvedenej sumy do 
+-- poisùovne za svojich zamestnancov 
+
+-- nepÌöe tam Ëo v prÌpade ûe maj˙ dvaja rovnak˙ sume, takûe sem d·m iba row_number
+select
+    *
+from( select 
+        za.ico ico,
+        za.nazov nazov,
+        sum(od.suma) suma,
+        row_number() over (order by sum(od.suma) desc) rn
+      from p_zamestnavatel za
+      join p_zamestnanec z on (za.ico = z.id_zamestnavatela)
+      join p_poistenie p on (p.rod_cislo = z.rod_cislo)
+      join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
+      group by za.ico, za.nazov)
+where rn between 6 and 12
+order by rn;
+
+-- ==================== TEST 5 ====================
+
+-- 39.) k jednotliv˝m n·zvom krajov zo öt·tu »esko vypÌöte percentu·lne zloûenie 
+-- samoplatcom a klasick˝ch zamestnancov 
+
+select count(*) from p_platitel; -- 5457
+select count(*) from p_osoba; -- 5446 
+select count(*) from p_poistenie; -- 8512
+
+select
+    k.n_kraja,
+    -- dostal za to plnku ale nezd· sa mi to 
+    sum( case when p.id_platitela is not null then 1 else 0 end) samoplatec,
+    sum( case when p.id_platitela is null then 1 else 0 end) zamestnanec,
+    count (p.rod_cislo)
+from p_krajina kr
+join p_kraj k on (k.id_krajiny = kr.id_krajiny)
+join p_okres ok on (ok.id_kraja = k.id_kraja)
+join p_mesto m on (m.id_okresu = ok.id_okresu)
+join p_osoba o on (o.psc = m.psc)
+join p_poistenie p on (p.rod_cislo = o.rod_cislo)
+where n_krajiny = 'Cesko'
+group by n_kraja;
+
+
 
 
 ---- TEST 6 ------
@@ -482,4 +632,30 @@ begin
 end;
 /
 */
+
+set SERVEROUTPUT on;
+
+
+declare
+    -- deklar·cia typu
+    TYPE moj_rekord IS RECORD(
+        rc char(11),
+        meno varchar2(20),
+        priezvisko varchar2(20)
+    );
+    rekord moj_rekord; -- deklar·cia premennej toho typu
+    cursor cur is (select rod_cislo, meno, priezvisko from os_udaje);
+begin
+    -- pr·ce s kurzorom 
+    open cur;
+    loop
+        fetch cur into rekord;
+        exit when cur%notfound;
+        dbms_output.put_line(rekord.rc || '  ' ||
+                                rekord.meno || '  ' ||
+                                rekord.priezvisko);
+    end loop;
+    close cur;
+end;
+/
 

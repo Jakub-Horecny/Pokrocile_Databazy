@@ -593,3 +593,6 @@ update student set rod_cislo = '851130/3695' where rod_cislo = '850130/3695';
 rollback;
 
 select * from student order by rod_cislo;
+
+
+

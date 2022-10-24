@@ -1,8 +1,23 @@
 -- Vypíšte osoby, ktoré nikdy neboli evidované ako telesne postihnuté. 
+select count( * )
+from (
 select * from
 p_osoba o
 where not exists (select 'x' from p_ztp z
-                    where o.rod_cislo = z.rod_cislo);
+                    join  p_typ_postihnutia t on(z.id_postihnutia = t.id_postihnutia)
+                    where nazov_postihnutia = 'Telesne Postihnutie'
+                        and o.rod_cislo = z.rod_cislo));
+   
+select count(*) from (
+
+select distinct o.rod_cislo, meno, priezvisko
+from p_osoba o
+  left join p_ZTP z on(o.rod_cislo = z.rod_cislo)
+where o.rod_cislo not in (select rod_cislo
+                          from p_ztp
+                            join p_typ_postihnutia on(p_ztp.id_postihnutia = p_typ_postihnutia.id_postihnutia)
+                          where nazov_postihnutia like 'Telesne Postihnutie'));
+      
 -- Ku každému kraju vypíšte 30% osôb s najväèšími odvodmi. 
 
 select count(* ) from (
@@ -42,7 +57,10 @@ create or replace type t_slimak as object
   farba varchar(200),
   vaha number,
   vek integer,
-  constructor function t_slimak(meno varchar, farba varchar, vaha number, vek integer)
+  constructor function t_slimak(meno varchar, 
+                                farba varchar, 
+                                vaha number, 
+                                vek integer)
   return self as result,
   map member function tried return varchar
 ) not final;
@@ -106,10 +124,11 @@ select distinct
 from p_osoba o
 left join p_poistenie p on (o.rod_cislo = p.rod_cislo)
 where 
-p.oslobodeny in ('a', 'A') or
-not exists (select 'x' from p_poistenie po
-                where o.rod_cislo = po.rod_cislo)
-                    order by meno); -- 4478
+    p.oslobodeny in ('a', 'A') 
+or
+    not exists (select 'x' from p_poistenie po
+                    where o.rod_cislo = po.rod_cislo)
+                        order by meno); -- 4478
 
 -- TOTO JE IBA NA KONTROLU
 select distinct oslobodeny from p_poistenie;
@@ -192,6 +211,8 @@ end;
 
 -- Vytvorte kolekciu èísel, vygenerujte do nej 100 èísel a prostredníctvom 
 -- anonymného bloku nájdite minimum a maximum. Skúste všetky 3 varianty kolekcií. 
+
+select dbms_random.value from dual;
 
 declare
     TYPE t_pole IS VARRAY(100) OF NUMBER;

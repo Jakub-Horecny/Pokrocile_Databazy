@@ -635,7 +635,7 @@ end;
 
 set SERVEROUTPUT on;
 
-
+-- ================= RECORD =================
 declare
     -- deklarácia typu
     TYPE moj_rekord IS RECORD(
@@ -658,4 +658,41 @@ begin
     close cur;
 end;
 /
+-- ================= BULK COLLECTION =================
+set serveroutput on;
+declare
+    type t_pole is table of varchar2(50);
+    pole t_pole;
+begin
+    select meno bulk collect into pole from os_udaje;
+    
+    for i in pole.first..pole.count
+    loop
+        dbms_output.put_line(pole(i));
+    end loop;
+end;
+/
+
+-- do kurzora 
+declare
+    type t_pole is table of os_udaje%rowtype;
+    pole t_pole;
+    cursor cur is (select * from os_udaje);
+begin
+    open cur;
+    loop
+        fetch cur bulk collect into pole;
+        exit when cur%notfound;
+    end loop;
+    close cur;
+    
+    for i in pole.first..pole.last
+    loop
+        dbms_output.put_line(pole(i).meno || ' ' || 
+                                pole(i).priezvisko || ' ' ||
+                                pole(i).rod_cislo);
+    end loop;
+end;
+/
+
 

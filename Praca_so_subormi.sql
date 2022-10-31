@@ -298,3 +298,4 @@ group by os_cislo;
 
 -- indexova sa dajú aj JSON dokumenty, nemôem indexova celı dokument, ale iba konkrétny element
 -- dá sa to indexova aj pre JSON pole 
+

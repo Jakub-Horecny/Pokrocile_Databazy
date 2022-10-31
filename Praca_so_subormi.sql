@@ -192,12 +192,12 @@ values (
         "Detail": 
         { 
           	"Publisher": "EDIS", 	
-             	"Publication_year": 2018, 	
+            "Publication_year": 2018, 	
            	"ISBN": "978-80-554-14881", 
            	"Language": "Slovak", 
-             	"Pages": null,
-             	"Price": 21.20,
-                "In_stock": false
+            "Pages": null,
+            "Price": 21.20,
+            "In_stock": false
         } 
 					
     }'
@@ -217,7 +217,7 @@ from books_json b
 where json_value(b.doc, '$.Detail.In_stock' returning number)=0;
 
 
--- vytvorenie JSON dokumentu cez select 
+-- select s JSON dokumentu  
 -- json_table - konötruktor, ktor˝ sa poûÌva napr. pri kolekci·ch (princÌp je rovnak˝)
 -- tieto relaËnÈ atrib˙ty nie s˙ key sensitive, pretoûe nie sme v JSON ötrukt˙re 
 
@@ -226,5 +226,75 @@ from books_json b,
      json_table(b.doc, '$'
         columns(Nazov_knihy varchar2(50) path Title, 
                 Kategoria varchar2(30) path Type)) jt;
+                
+
+-- vydavatel je premen·, do ktorej sa uloûÌ hodnota s JOSN dokumentu 
+select 
+    jt.vydavatel
+from books_json b,
+json_table(b.doc, '$' columns(vydavatel varchar2(50) path Detail.Publisher)) jt;
 
 
+select 
+    jt.prvy_autor
+from books_json b,
+json_table(b.doc, '$' 
+                    columns(prvy_autor varchar2(50) path Author[0])) jt;
+
+
+-- prvy_autor vypÌöen null, aj ke¥d som to skopÌroval s jeho prezent·cie \_(o,o)_/
+select 
+    jt.nazov_knihy, 
+    prvy_autor
+from books_json b, 
+ json_table(b.doc, '$'
+      columns(Nazov_knihy varchar2(50) path Title, 
+              Prvy_autor varchar2(50) path Author[1])) jt;
+   
+   
+-- ================= vytvorenie JSON objektu cez SELECK =================          
+
+
+-- kde nedoölo k spojeniu je NULL
+select json_object(meno, priezvisko, os_cislo)
+from os_udaje 
+left join student using(rod_cislo);
+
+
+-- ABSENT ON NULL, ak je os_cislo NULL atrib˙t tam nebude 
+select json_object(meno, priezvisko, os_cislo ABSENT ON NULL)
+from os_udaje 
+left join student using(rod_cislo);
+
+
+-- vytvorenie vlastn˝ch atrib˙tov pre JSON s˙bor 
+select json_object('full_name' value meno || ' ' || priezvisko,
+                    'student_id' value os_cislo,
+                    'student_info' value json_object('class' value rocnik,
+                                                     'st_group' value st_skupina))
+from os_udaje join student using(rod_cislo);
+
+
+-- pouûitie agregaËnej funkcie MIN MAX
+select json_object('name' value meno || ' ' || priezvisko, 
+                   'student_id' value os_cislo, 
+                   'student_info' value 
+                         json_object('class' value rocnik, 
+                                     'st_group' value st_skupina), 
+                   'reg_subjects' value 
+                        json_array(min(vysledok), max(vysledok)))
+from os_udaje 
+join student using(rod_cislo)
+join zap_predmety using(os_cislo)
+group by meno, priezvisko, os_cislo, rocnik, st_skupina; 
+
+
+-- z tohto nevznikne pole 
+select
+    os_cislo,
+    json_objectagg('predmet' value cis_predm || '-' || vysledok)
+from zap_predmety
+group by os_cislo;
+
+-- indexovaù sa daj˙ aj JSON dokumenty, nemÙûem indexovaù cel˝ dokument, ale iba konkrÈtny element
+-- d· sa to indexovaù aj pre JSON pole 

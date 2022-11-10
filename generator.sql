@@ -13,3 +13,4 @@ group by obec;
 
 select * from priklad_db2.os_udaje;
 
+

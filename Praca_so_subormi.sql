@@ -31,11 +31,93 @@ insert into states_json(code,doc) values('SK',(select json_web_service_geo from 
 insert into states_json(code, doc) values('AT', (select json_web_service_geo('AT') from dual));
 insert into states_json(code, doc) values('AL', (select json_web_service_geo('AL') from dual));
 insert into states_json(code, doc) values('DZ', (select json_web_service_geo('DZ') from dual));
+insert into states_json(code, doc) values('AI', (select json_web_service_geo('AI') from dual));
+insert into states_json(code, doc) values('BD', (select json_web_service_geo('BD') from dual));
 
 select * from states_json;
 
 update states_json set doc=(select json_web_service_geo from dual)
 where code = 'SK';
+
+delete states_json where code = 'DZ';
+
+select 
+    s.code code,
+    s.doc.geonames.continent continent,
+    s.doc.geonames.capital capital,
+    s.doc.geonames.languages languages,
+    s.doc.geonames.countryName countryName
+from states_json s;
+
+/*
+'{	
+    "Title": "Databázové systémy", 			
+    "Author": [{"Name":"Karol Matiasko", "email": "karol.matiasko@fri.uniza.sk"}, 
+                       {"Name":"Michal Kvet", "email": "michal.kvet@fri.uniza.sk"},
+                      {"Name":"Marek Kvet", "email": "marek.kvet@fri.uniza.sk"}
+                    ],
+    "Type": "studying literature",
+        "Detail": 
+        { 
+          	"Publisher": "EDIS", 	
+            "Publication_year": 2018, 	
+           	"ISBN": "978-80-554-14881", 
+           	"Language": "Slovak", 
+            "Pages": null,
+            "Price": 21.20,
+            "In_stock": false
+        } 
+					
+    }'
+*/
+
+/*
+{"geonames": 
+    [{
+      "continent": "EU",
+      "capital": "Bratislava",
+      "languages": "sk,hu",
+      "geonameId": 3057568,
+      "south": 47.7313590000001,
+      "isoAlpha3": "SVK",
+      "north": 49.6137360000001,
+      "fipsCode": "LO",
+      "population": "5447011",
+      "east": 22.5657383340001,
+      "isoNumeric": "703",
+      "areaInSqKm": "48845.0",
+      "countryCode": "SK",
+      "west": 16.8334234020001,
+      "countryName": "Slovakia",
+      "postalCodeFormat": "### ##",
+      "continentName": "Europe",
+      "currencyCode": "EUR"
+    }]
+}
+*/
+-- z nejakého dôvodu to nejde 
+select
+    jt.m 
+from states_json s,
+json_table(s.doc, '$' columns(m varchar2(50) path geonames.north)) jt;
+
+
+-- musím sa najskôr odkazova na premennú v tabu¾ke 
+select s.doc.geonames.languages from states_json s;
+
+select * from (
+    select 
+        s.doc.geonames.languages languages, 
+        rank() over (order by s.doc.geonames.languages) rn  
+    from states_json s)
+where rn > 0;
+
+-- takto spravím substr pre languages
+select distinct 
+    regexp_substr(s.doc.geonames.languages,'[^,]+', 1, level) languages
+from states_json s
+connect by regexp_substr(s.doc.geonames.languages, '[^,]+', 1, level) is not null;
+
 
 
 -- ==================== PRAKTICKE CVICENIE ======================

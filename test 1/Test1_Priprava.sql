@@ -1,5 +1,5 @@
-/* 1.) Urèite správny príkaz na vloenie nového priadku do tabu¾ky zamestnanci s 
-nasledujúcov štruktúrov */
+/* 1.) UrÄite sprÃ¡vny prÃ­kaz na vloÅ¾enie novÃ©ho priadku do tabuÄ¾ky zamestnanci s 
+nasledujÃºcov Å¡truktÃºrov */
 
 create type t_osoba1 is object (
     rc char(11),
@@ -17,8 +17,8 @@ create type t_zam under t_osoba1(
 
 create table zamestnanci of t_zam;
 desc zamestnanci;
--- správny insert, keï si to pozrieš cez desc t_zam, ako by tabu¾ka zamestnanci 
--- mala5 ståpcov 
+-- sprÃ¡vny insert, keÄ si to pozrieÅ¡ cez desc t_zam, ako by tabuÄ¾ka zamestnanci 
+-- mala5 stÄºpcov 
 /*
 Name       Null? Type         
 ---------- ----- ------------ 
@@ -40,10 +40,10 @@ drop type t_zam;
 drop type t_osoba1;
 
 /*
-2.) K jednotlivım krajom Slovenskej republiky a mesiacom prvého kvartálu roku 2008 
-vypíšte celkovú sumu odvedenú samoplatcami
+2.) K jednotlivÃ½m krajom Slovenskej republiky a mesiacom prvÃ©ho kvartÃ¡lu roku 2008 
+vypÃ­Å¡te celkovÃº sumu odvedenÃº samoplatcami
 */
--- je to pre jednotlivé mesiace, ak iba kvartáli tak preè: 'M' ||  extract(month from dat_platby) mesiac 
+-- je to pre jednotlivÃ© mesiace, ak iba kvartÃ¡li tak preÄ: 'M' ||  extract(month from dat_platby) mesiac 
 select 
     kr.n_kraja, 
     sum(suma) suma,
@@ -56,12 +56,12 @@ join p_poistenie p on (p.rod_cislo = o.rod_cislo)
 join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
 where p.oslobodeny in ('n', 'N')
 and extract(month from dat_platby) between 1 and 4
-and extract(year from dat_platby) = 2016 -- 2008 niè nevráti nie sú záznami, 2016 áno
+and extract(year from dat_platby) = 2016 -- 2008 niÄ nevrÃ¡ti nie sÃº zÃ¡znami, 2016 Ã¡no
 group by kr.n_kraja, kr.id_kraja, 'M' ||  extract(month from dat_platby) 
 order by kr.n_kraja, 'M' ||  extract(month from dat_platby)
 ;
 
--- 6.) vypísa kraje kde bıva viac ien ako muov 
+-- 6.) vypÃ­saÅ¥ kraje kde bÃ½va viac Å¾ien ako muÅ¾ov 
 select 
     kraj
 from (select 
@@ -76,8 +76,8 @@ from (select
         )
 where zena > muz;
 
--- 16.) Ku kadému drite¾ovi ZTP vypíšte sumu príspevkov, 
--- ktoré dostal za minulı kalendárny rok.
+-- 16.) Ku kaÅ¾dÃ©mu drÅ¾iteÄ¾ovi ZTP vypÃ­Å¡te sumu prÃ­spevkov, 
+-- ktorÃ© dostal za minulÃ½ kalendÃ¡rny rok.
 
 select 
     o.rod_cislo, 
@@ -91,8 +91,8 @@ where extract(year from pr.obdobie) = (extract(year from sysdate)) - 6
 GROUP by o.rod_cislo, o.meno, o.priezvisko
 order by o.meno;
 
--- 23.) K jednotlivım názvom zamestnávate¾ov a kvartálom minulého roka vypíšte 
--- poèet prijatıch osôb do zamestnania
+-- 23.) K jednotlivÃ½m nÃ¡zvom zamestnÃ¡vateÄ¾ov a kvartÃ¡lom minulÃ©ho roka vypÃ­Å¡te 
+-- poÄet prijatÃ½ch osÃ´b do zamestnania
 
 select 
     ('Q' || ceil((extract(month from za.dat_od)) / 3)) kvartal,
@@ -100,39 +100,28 @@ select
     count(*)
 from p_zamestnavatel z
 join p_zamestnanec za on(za.id_zamestnavatela = z.ico)
-where extract(year from dat_od) = extract(year from sysdate) -6  -- -1 niè nedá
+where extract(year from dat_od) = extract(year from sysdate) -6  -- -1 niÄ nedÃ¡
 group by ('Q' || ceil((extract(month from za.dat_od)) / 3)), z.nazov
 order by z.nazov, kvartal;
 
 -- 24.)
--- Pre kadı okres vypíšte osobu, ktorá bola poistencom najdlhšie. Ak bola evidovaná viackrát, intervaly sèítajte
-SELECT 
-    n_okresu, 
-    meno, 
-    priezvisko 
-FROM
-    (SELECT 
-        n_okresu, 
-        meno, 
-        priezvisko, 
-        RANK() OVER (PARTITION BY id_okresu ORDER BY trvanie DESC) poradie 
-    FROM
-        (SELECT 
-            n_okresu, 
-            id_okresu, 
-            meno, 
-            priezvisko, 
-            SUM(NVL(dat_do, SYSDATE) - dat_od) trvanie
-        FROM p_okres 
-        JOIN p_mesto USING (id_okresu) 
-        JOIN p_osoba USING (PSC)
-        JOIN p_poistenie 
-        USING (rod_cislo)
-        GROUP BY n_okresu, id_okresu, meno, priezvisko, rod_cislo))
-WHERE poradie = 1;
+-- Pre kaÅ¾dÃ½ okres vypÃ­Å¡te osobu, ktorÃ¡ bola poistencom najdlhÅ¡ie. Ak bola evidovanÃ¡ viackrÃ¡t, intervaly sÄÃ­tajte
+select n_okresu, rod_cislo, poradie, dlzka from(
+    select n_okresu , 
+            rod_cislo, 
+            rank() over (partition by o.id_okresu order by sum( nvl(dat_do,sysdate) - dat_od )desc) poradie,
+            sum( nvl(dat_do,sysdate) - dat_od ) dlzka
+    from p_okres o
+         join p_mesto m on(m.id_okresu = o.id_okresu)
+            join p_osoba os on(os.PSC = m.PSC)
+                join p_poistenie p using(rod_cislo)
+                
+    group by n_okresu, rod_cislo, o.id_okresu
+) where poradie =1
+order by n_okresu;
 
 -- 38.)
--- Pre jednotlivé mestá Nitrianskeho kraja vypíšte percentuálne rozloenie muov a ien.
+-- Pre jednotlivÃ© mestÃ¡ Nitrianskeho kraja vypÃ­Å¡te percentuÃ¡lne rozloÅ¾enie muÅ¾ov a Å¾ien.
 select * from p_kraj; -- NR
 
 select
@@ -150,7 +139,7 @@ where k.id_kraja = 'NR'
 group by m.n_mesta;
 
 -- 43.)
--- Vypíšte 5% obyvate¾ov s najväèšími odvodmi do poisovne pre kadé mesto osobitne.
+-- VypÃ­Å¡te 5% obyvateÄ¾ov s najvÃ¤ÄÅ¡Ã­mi odvodmi do poisÅ¥ovne pre kaÅ¾dÃ© mesto osobitne.
 select
     mesto,
     meno,
@@ -187,7 +176,7 @@ p_poistenie USING (rod_cislo) JOIN p_odvod_platba USING (id_poistenca) WHERE n_m
 
 -- =============== TEST 2 ====================
 -- 13.)
--- K jednotlivım zamestnávate¾om vypíšte poèet zamestnancov a samoplatcov do 4O rokov.
+-- K jednotlivÃ½m zamestnÃ¡vateÄ¾om vypÃ­Å¡te poÄet zamestnancov a samoplatcov do 4O rokov.
 
 select * from p_platitel;
 select 
@@ -205,7 +194,7 @@ where to_date(substr(za.rod_cislo,1,2) || '.' ||
 group by z.nazov;
 
 
---13. K jednotlivım zamestnávate¾om vypíšte poèet zamestnancov a samoplatcov do 4O rokov
+--13. K jednotlivÃ½m zamestnÃ¡vateÄ¾om vypÃ­Å¡te poÄet zamestnancov a samoplatcov do 4O rokov
 select 
     nazov, 
     sum(case when id_platitela = rod_cislo then 1 else 0 end) samoplatca,
@@ -217,9 +206,9 @@ where to_number(substr(rod_cislo,1,2)) <= extract(year from sysdate)-40
 group by nazov;
 
 -- 24.)
--- Pre jednotlivé rozpätia súm 0 - 2000, 2001-40000,40001 - 80000 
--- vypíšte poèet osôb, ktorí túto èiastku celkovo odviedli do
--- poisovne a sú z okresu ilina.
+-- Pre jednotlivÃ© rozpÃ¤tia sÃºm 0 - 2000, 2001-40000,40001 - 80000 
+-- vypÃ­Å¡te poÄet osÃ´b, ktorÃ­ tÃºto Äiastku celkovo odviedli do
+-- poisÅ¥ovne a sÃº z okresu Å½ilina.
 
 select
     sum(case when suma >= 0 and suma <= 2000 then 1 else 0 end) s_0_2000,
@@ -236,7 +225,7 @@ join p_poistenie po on (po.rod_cislo = o.rod_cislo)
 join p_odvod_platba od on (od.id_poistenca = po.id_poistenca)
 where ok.id_okresu = 'ZA'
 group by po.id_poistenca);
--- suma môe by v sume 
+-- suma mÃ´Å¾e byÅ¥ v sume 
 select
     sum(case when sum(od.suma) >= 0 and sum(od.suma) <= 2000 then 1 else 0 end) s_0_2000,
     sum(case when sum(od.suma) > 2000 and sum(od.suma) <= 40000 then 1 else 0 end) s_2001_40000,
@@ -251,7 +240,7 @@ group by po.id_poistenca;
 
 
 -- 25.)
--- Vypíšte 30% naj¾udnatejších krajín
+-- VypÃ­Å¡te 30% najÄ¾udnatejÅ¡Ã­ch krajÃ­n
 select 
     rn,
     krajina,
@@ -271,7 +260,7 @@ having rn <= ceil((select count(id_krajiny) from p_krajina)*0.3)
 group by krajina, rn, pocet
 order by rn;
 
--- Vypíšte 30% naj¾udnatejších miest
+-- VypÃ­Å¡te 30% najÄ¾udnatejÅ¡Ã­ch miest
 select 
     rn,
     mesto,
@@ -290,9 +279,9 @@ order by rn; --254
 select count(psc) from p_mesto; -- 846
 
 -- 26.)
--- Pre jednotlivé rozpätia súm 0 - 2000, 2001-40000,40001 - 80000 
--- vypíšte percentuálne rozloenie osôb, ktorí túto èiastku celkovo
--- odviedli do poisovne a sú z okresu ilina.
+-- Pre jednotlivÃ© rozpÃ¤tia sÃºm 0 - 2000, 2001-40000,40001 - 80000 
+-- vypÃ­Å¡te percentuÃ¡lne rozloÅ¾enie osÃ´b, ktorÃ­ tÃºto Äiastku celkovo
+-- odviedli do poisÅ¥ovne a sÃº z okresu Å½ilina.
 select
     round(sum(case when suma >= 0 and suma <= 2000 then 1 else 0 end)
         /count(suma)*100,2) s_0_2000,
@@ -315,8 +304,8 @@ group by po.id_poistenca);
 
 
 -- 37.)
--- Pre kadı typ postihnutia vypíšte 3 osoby pod¾a dåky poberanie daného 
--- príspevku. Ak osoba poberala danı príspevok viackrát, dobu spoèítajte (p_ztp)
+-- Pre kaÅ¾dÃ½ typ postihnutia vypÃ­Å¡te 3 osoby podÄ¾a dÄºÅ¾ky poberanie danÃ©ho 
+-- prÃ­spevku. Ak osoba poberala danÃ½ prÃ­spevok viackrÃ¡t, dobu spoÄÃ­tajte (p_ztp)
 select
     typ,
     rn,
@@ -340,8 +329,8 @@ group by typ, meno, priezvisko, rod_cislo,  rn
 order by typ, rn;
 
 -- 38.)
--- Pre kadú firmu vypíšte 3 zamestnancov,
--- za ktorıch sa zaplatilo minulı rok na odvodoch najviac.
+-- Pre kaÅ¾dÃº firmu vypÃ­Å¡te 3 zamestnancov,
+-- za ktorÃ½ch sa zaplatilo minulÃ½ rok na odvodoch najviac.
 
 select * from p_zamestnanec z
 join p_poistenie p on(z.rod_cislo = p.rod_cislo);
@@ -369,19 +358,19 @@ group by  nazov, rn, rod_cislo
 order by nazov, rn;
 
 -- 40.)
--- pomocou SQL vygenerujte prízak na zamknutie kont všetkıch študentov, ktorı nemajú zapísanı predmet 
--- v šk. roku 2005 (pomocou tabu¾ky zoznam a systémovej tabu¾ky all_users) 
--- syntax príkazu: alter user login account lock;
+-- pomocou SQL vygenerujte prÃ­zak na zamknutie kont vÅ¡etkÃ½ch Å¡tudentov, ktorÃ½ nemajÃº zapÃ­sanÃ½ predmet 
+-- v Å¡k. roku 2005 (pomocou tabuÄ¾ky zoznam a systÃ©movej tabuÄ¾ky all_users) 
+-- syntax prÃ­kazu: alter user login account lock;
 
 select 'alter user ' || login || ' account lock;'
 from zoznam
-where not exists (select 'x' from zoznam where skrok<>'2005');-- nieèo tu je zle ale neviem èo 
+where not exists (select 'x' from zoznam where skrok<>'2005');-- nieÄo tu je zle ale neviem Äo 
 
 -- 42.)
--- Vypíšte názvy typov príspevkov, ktoré NEBOLI vyplácané minulı kalendárny mesiac. 
--- Pouèite EXISTS
+-- VypÃ­Å¡te nÃ¡zvy typov prÃ­spevkov, ktorÃ© NEBOLI vyplÃ¡canÃ© minulÃ½ kalendÃ¡rny mesiac. 
+-- PouÄite EXISTS
 
--- -71 nieèo vypíše 
+-- -71 nieÄo vypÃ­Å¡e 
 select
     t.id_typu,
     t.popis
@@ -393,8 +382,8 @@ where not exists (select 'x' from p_prispevky
 -- ==================== TEST 3 ====================
 
 -- 40.)
--- pre jednotlivé rozpetie súm 0-2000, 2001-40000, 40001-80000 vypíšte percentuálne
--- rozloenie osôb, ktorí túto èiastku celkovo odviedli do poistovne a sú z okresu ilina 
+-- pre jednotlivÃ© rozpetie sÃºm 0-2000, 2001-40000, 40001-80000 vypÃ­Å¡te percentuÃ¡lne
+-- rozloÅ¾enie osÃ´b, ktorÃ­ tÃºto Äiastku celkovo odviedli do poistovne a sÃº z okresu Å½ilina 
 
 select
     round(sum(case when suma >= 0 and suma <= 2000 then 1 else 0 end)
@@ -404,7 +393,7 @@ select
     round(sum(case when suma > 40000 then 1 else 0 end)
         /count(suma)*100,2)s_40001_80000
 from (
--- tu som pre jednotlivıch poistencov zistil ko¾ko odviedli 
+-- tu som pre jednotlivÃ½ch poistencov zistil koÄ¾ko odviedli 
 select
     po.id_poistenca poistenec,
     sum(od.suma) suma
@@ -417,7 +406,7 @@ where ok.id_okresu = 'ZA'
 group by po.id_poistenca);
 
 -- 42.)
--- vypísa 5% obyvate¾ov s najväèšími odvodmi do poiovne pre kadé mesot osobitne
+-- vypÃ­saÅ¥ 5% obyvateÄ¾ov s najvÃ¤ÄÅ¡Ã­mi odvodmi do poiÅ¥ovne pre kaÅ¾dÃ© mesot osobitne
 -- nefunguje dobre 
 select 
     *
@@ -431,14 +420,14 @@ from
     join p_osoba o on (m.psc = o.psc)
     join p_poistenie p on (o.rod_cislo = p.rod_cislo)
     join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
-    group by m.psc, m.n_mesta, p.id_poistenca, p.rod_cislo) -- neviem èi aj pod¾a o.rod_cislo
+    group by m.psc, m.n_mesta, p.id_poistenca, p.rod_cislo) -- neviem Äi aj podÄ¾a o.rod_cislo
 where rn <= ceil((select count(*) 
                     from p_osoba 
                     where p_osoba.psc = psc)*0.05)    
 group by mesto, poistenec, rn, psc
 order by mesto, rn;
 
--- iba 5% obyvate¾ov s najväèšími dovodmi 
+-- iba 5% obyvateÄ¾ov s najvÃ¤ÄÅ¡Ã­mi dovodmi 
 select 
     *
 from 
@@ -458,10 +447,10 @@ order by rn;
 -- ================ TEST 4 ===================
 
 -- 23.)
--- vypíšte zamestnávate¾ov od 6 po 12 miesto na základe CELKOVEJ odvedenej sumy do 
--- poisovne za svojich zamestnancov 
+-- vypÃ­Å¡te zamestnÃ¡vateÄ¾ov od 6 po 12 miesto na zÃ¡klade CELKOVEJ odvedenej sumy do 
+-- poisÅ¥ovne za svojich zamestnancov 
 
--- nepíše tam èo v prípade e majú dvaja rovnakú sume, take sem dám iba row_number
+-- nepÃ­Å¡e tam Äo v prÃ­pade Å¾e majÃº dvaja rovnakÃº sume, takÅ¾e sem dÃ¡m iba row_number
 select
     *
 from( select 
@@ -479,8 +468,8 @@ order by rn;
 
 -- ==================== TEST 5 ====================
 
--- 39.) k jednotlivım názvom krajov zo štátu Èesko vypíšte percentuálne zloenie 
--- samoplatcom a klasickıch zamestnancov 
+-- 39.) k jednotlivÃ½m nÃ¡zvom krajov zo Å¡tÃ¡tu ÄŒesko vypÃ­Å¡te percentuÃ¡lne zloÅ¾enie 
+-- samoplatcom a klasickÃ½ch zamestnancov 
 
 select count(*) from p_platitel; -- 5457
 select count(*) from p_osoba; -- 5446 
@@ -488,7 +477,7 @@ select count(*) from p_poistenie; -- 8512
 
 select
     k.n_kraja,
-    -- dostal za to plnku ale nezdá sa mi to 
+    -- dostal za to plnku ale nezdÃ¡ sa mi to 
     sum( case when p.id_platitela is not null then 1 else 0 end) samoplatec,
     sum( case when p.id_platitela is null then 1 else 0 end) zamestnanec,
     count (p.rod_cislo)
@@ -506,8 +495,8 @@ group by n_kraja;
 
 ---- TEST 6 ------
 -- 43.)
--- Vypíšte ku kadému okresu Trenèianskeho kraja poèet muov a ien, 
--- ktoré sa v narodili na Štedrı deò. 
+-- VypÃ­Å¡te ku kaÅ¾dÃ©mu okresu TrenÄianskeho kraja poÄet muÅ¾ov a Å¾ien, 
+-- ktorÃ© sa v narodili na Å tedrÃ½ deÅˆ. 
  select * from p_kraj;
  select 
     ok.n_okresu okres,
@@ -542,7 +531,7 @@ end;
 
 -- ======== TITANIK EVERGREEN ===========
 
--- vypíšte všetkıch zamestnávate¾ov, ktorı nemajú zamestnancov
+-- vypÃ­Å¡te vÅ¡etkÃ½ch zamestnÃ¡vateÄ¾ov, ktorÃ½ nemajÃº zamestnancov
 select
     za.nazov
 from p_zamestnavatel za
@@ -555,7 +544,7 @@ select * from p_zamestnavatel;
 select count(*) from p_zamestnanec;
   -- where id_zamestnavatela <> '85794515';
   
--- pre kadého zamestnavate¾a vypísa ko¾ko má zamestnncov 
+-- pre kaÅ¾dÃ©ho zamestnavateÄ¾a vypÃ­saÅ¥ koÄ¾ko mÃ¡ zamestnncov 
 select
     za.nazov,
     count(z.rod_cislo)
@@ -564,7 +553,7 @@ left join p_zamestnanec z on (za.ico = z.id_zamestnavatela)
 --having count(z.rod_cislo) = 0
 group by za.nazov;
 
--- vypísa poistencov a ak existuje pladba tak aj cis_platby a sumu
+-- vypÃ­saÅ¥ poistencov a ak existuje pladba tak aj cis_platby a sumu
 select
     o.meno,
     o.priezvisko,
@@ -576,8 +565,8 @@ join p_poistenie po on(o.rod_cislo = po.rod_cislo)
 left join p_odvod_platba od on(od.id_poistenca = po.id_poistenca)
 order by od.suma ;
 
--- vypísa všetky eny pre všetky okresy, ak tam nie sú eny, 
--- vypísa aspoò názov okresa
+-- vypÃ­saÅ¥ vÅ¡etky Å¾eny pre vÅ¡etky okresy, ak tam nie sÃº Å¾eny, 
+-- vypÃ­saÅ¥ aspoÅˆ nÃ¡zov okresa
 select
     ok.n_okresu,
     o.meno,
@@ -597,14 +586,14 @@ left join p_osoba o on(m.psc = o.psc)
 where substr(o.rod_cislo,3,1) > 1
 order by m.n_mesta, o.meno desc;
     
--- vypísa všetkıch poistencov, odkedy sú poistencami a ak sú aj zamestnancami
--- tak ich ID a odkedy pracujú
+-- vypÃ­saÅ¥ vÅ¡etkÃ½ch poistencov, odkedy sÃº poistencami a ak sÃº aj zamestnancami
+-- tak ich ID a odkedy pracujÃº
 
 select
     o.meno,
     o.priezvisko,
     p.rod_cislo,
-    max(p.dat_od), -- aby to kadého èloveka vypísalo iba raz 
+    max(p.dat_od), -- aby to kaÅ¾dÃ©ho Äloveka vypÃ­salo iba raz 
     z.id_poistenca,
     z.dat_od
 from p_osoba o 
@@ -613,7 +602,7 @@ left join p_zamestnanec z on(z.rod_cislo = p.rod_cislo)
 group by o.meno, o.priezvisko, z.id_poistenca, z.dat_od, p.rod_cislo
 order by z.id_poistenca;
 
--- vytvori typ T_SUPERMARKET s troma ¾ubovo¾ními typmi a vytvori premennú typu T_SUPERMARKET
+-- vytvoriÅ¥ typ T_SUPERMARKET s troma Ä¾ubovoÄ¾nÃ­mi typmi a vytvoriÅ¥ premennÃº typu T_SUPERMARKET
 
 create type t_supermarket as object(
     id integer,
@@ -621,7 +610,7 @@ create type t_supermarket as object(
     popis varchar2(100)
 )not final;
 /
--- takto tú premnnú??
+-- takto tÃº premnnÃº??
 variable super t_supermarket;
 ;
 /*
@@ -637,16 +626,16 @@ set SERVEROUTPUT on;
 
 -- ================= RECORD =================
 declare
-    -- deklarácia typu
+    -- deklarÃ¡cia typu
     TYPE moj_rekord IS RECORD(
         rc char(11),
         meno varchar2(20),
         priezvisko varchar2(20)
     );
-    rekord moj_rekord; -- deklarácia premennej toho typu
+    rekord moj_rekord; -- deklarÃ¡cia premennej toho typu
     cursor cur is (select rod_cislo, meno, priezvisko from os_udaje);
 begin
-    -- práce s kurzorom 
+    -- prÃ¡ce s kurzorom 
     open cur;
     loop
         fetch cur into rekord;

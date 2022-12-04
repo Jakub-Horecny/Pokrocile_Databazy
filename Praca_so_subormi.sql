@@ -96,6 +96,8 @@ from states_json s;
 }
 */
 -- z nejakÈho dÙvodu to nejde 
+
+
 select
     jt.m 
 from states_json s,
@@ -151,6 +153,8 @@ values (
     }'
 );
 
+select b.doc.Author from books_json b;
+
 insert into books_json (doc)
 values (
     '{	
@@ -181,9 +185,15 @@ select json_serialize(b.doc) from books_json b;
 
 -- teraz neviem povedaù Ëi tam nem·m takÈho autora, alebo tak˝to element neexistuje 
 select 
-    b.doc.Author 
+    b.doc.Author[0] 
 from books_json b
 where b.doc.Author like '%Matiasko%';
+
+
+select
+     b.doc.Author 
+from books_json b
+where json_exists(b.doc, '$?(@.Author=="Karol Matiasko")');
 
 -- v bin·rnej forme mi vr·ti Ëi ten element existuje 
 select 

@@ -179,3 +179,163 @@ where meno like 'M%';
 
 select rod_cislo, meno, priezvisko from os_udaje
 where meno not like 'M%';
+
+
+
+
+
+
+
+
+
+
+/*------------XML----------------*/
+
+/*<osoby>
+    <osoba RC=”551224/1234”>
+       <cele_meno>Michal Tester</cele_meno>
+       <id>123456</id>
+       <sumy>1000</sumy>
+    </osoba>
+    ....
+</osoby>
+*/
+
+
+create table xml_test of xmltype;
+
+delete xml_test;
+
+--insert into xml_test 
+select xmlroot(
+                xmlelement("osoby",
+                            XMLagg(
+                            xmlelement("osoba", xmlattributes(rod_cislo as "rc"),
+                            xmlforest(cele as "cele_meno",
+                                        id as "id"),
+                            xmlelement("sumy", sumy)
+                                         )
+                                    )                           
+                        ), version '1.0') as s_xml
+from (
+    select
+        (o.meno || ' ' || o. priezvisko) cele,
+        o.rod_cislo rod_cislo,
+        p.id_poistenca id,
+        sum(od.suma) sumy
+    from p_osoba o
+    join p_poistenie p on (o.rod_cislo= p.rod_cislo)
+    join p_odvod_platba od on (od.id_poistenca = p.id_poistenca)
+    group by o.meno, o.priezvisko, o.rod_cislo, p.id_poistenca
+);
+
+
+select * from xml_test;
+select extract(value(x) , 'osoby/osoba[@rc="745426/8459"]') from xml_test x;
+select extract(value(x), '/osoby/osoba/cele_meno') from xml_test x;
+
+
+select * from p_osoba;
+
+
+
+select 'insert into os_udaje(rod_cislo, meno, priezvisko) values(''' || rod_cislo || ''','''
+                                                                    || meno || ''','''
+                                                                    || priezvisko || ''');'
+from p_osoba;
+
+
+select * from priklad_db2.predmet_bod;
+
+select 'insert into predmet_bod values(''' || cis_predm || ''','''
+                                            || skrok || ''','''
+                                            || ects || ''','''
+                                            || semester || ''','''
+                                            || forma_kont ||''');'
+from priklad_db2.predmet_bod;
+
+
+-- Pomocou SQL príkazu generujte príkazy na pridelenie práva "create any directory" 
+--všetkým užívate¾om z predmetu II07 v šk. roku 2005. (
+begin
+    for riadok in (select 'create any directory to ' || login || from os_udaje
+    where cis_pred='II07' and extract(year from skrok) = 2005
+end;
+/
+
+begin
+    for riadok in (select 'change password ' || login || ' set to ' 
+    substr(meno,1,1) || substr(priezvisko,1,1) || os_cislo from os_udaje) as prikaz
+    loop
+        execute immediate riadok.prikaz; 
+    end loop;
+end;
+/
+
+/*
+Príkaz 1: select id_poistenca, dat_od from p_poistenie; 
+Príkaz 2: select DISTINCT id_poistenca, dat_od from p_poistenie; 
+Príkaz 3: select id_poistenca from p_poistenie; (
+*/
+
+declare 
+    type t_pole IS VARRAY(10) OF integer; 
+    i integer; 
+    pole t_pole; 
+    j integer; 
+begin 
+    pole := t_pole(1,2,3,4,5,6,7,8);
+    pole.delete(3); 
+    j := pole.first; 
+    for i in 1 .. pole.count 
+    loop dbms_output.put_line(pole(j)); 
+    j := pole.next(j); 
+    end loop; 
+end;
+/
+
+/*
+40. Pomocou SQL vygenerujte príkazy na zamknutie kont všetkých študentov, ktorí nemajú zapísaný predmet v šk. roku 2005.
+(pomocou tabulky zoznam a systémovej tabu¾ky all_users) syntax prikazu: alter user login account lock; (
+*/
+
+select 'alter user ' || login || ' account lock' from zoznam 
+where not exists (select 'x' from zoznam where skrok<>2005);    
+
+drop table pom1;
+create table pom1(id integer);
+
+create or replace procedure temp_p1
+as
+  --  PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+    insert into pom1 values(100);
+   -- rollback;
+   commit;
+end;
+/
+
+create or replace procedure temp_p2
+as
+begin
+    temp_p1;
+    insert into pom1 values(100);
+    rollback;
+end;
+/
+
+set autocommit on;
+create or replace procedure temp_p3
+as
+begin
+    for i in 1..10
+    loop
+        insert into pom1 values(i*10);
+    end loop;
+    rollback;
+end;
+/
+
+
+exec temp_p3;
+select * from pom1;

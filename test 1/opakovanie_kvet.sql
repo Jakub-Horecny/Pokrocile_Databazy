@@ -67,9 +67,9 @@ create or replace type t_slimak as object
 /
 
 declare
-    slimak t_slimak := t_slimak();
+    slimak t_slimak;
 begin
-    dbms_output.put_line('');
+    slimak := t_slimak();
 end;
 /
 

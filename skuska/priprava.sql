@@ -28,6 +28,21 @@ from (
 group by skupina
 order by skupina;
 
+-- napÌöte select, ktor˝m rozdelÌùe vöetky ZTP osoby do 10 skupÌn tak, aby 
+-- rozdiel poËtu osob v jednotlivej skupine bol maxim·lne +- 1
+
+select
+    mod(rn,10) skupina,
+    rod
+from (
+select 
+    o.rod_cislo rod,
+    row_number() over (order by o.rod_cislo) rn
+from p_osoba o
+where exists(select 'x' from p_ztp z
+                where z.rod_cislo = o.rod_cislo));
+
+                
 
 -- 2.) naplniù index by table d·tami tak ûe index, kde daù d·ta, bude id poberatela
 -- a d·ta bud˙ d·tum_od, d·tum_do
@@ -314,3 +329,175 @@ end;
 /
 
 select count(*) from pom;
+
+
+select rod_cislo, meno, priezvisko, sum(suma) 
+from p_osoba JOIN p_poistenie USING ( rod_cislo ) 
+JOIN p_odvod_platba USING ( id_poistenca ) 
+where to_char(obdobie, 'YYYY') = 2016 
+group by rod_cislo, meno, priezvisko ;
+
+CREATE INDEX test1 ON p_odvod_platba(to_char(obdobie, 'YYYY'), suma);
+drop index test1;
+
+-- VypÌöte 5% obyvateæov s najv‰ËöÌmi odvodmi do poisùovne pre kaûdÈ mesto osobitne
+select
+    mesto,
+    rod_cislo,
+    suma,
+    rn
+from (
+    select
+        m.n_mesta mesto,
+        o.rod_cislo rod_cislo,
+        sum(od.suma) suma,
+        rank() over (partition by m.n_mesta order by sum(od.suma) desc) rn
+    from p_mesto m
+    join p_osoba o on(o.psc = m.psc)
+    join p_poistenie po on(po.rod_cislo = o.rod_cislo)
+    join p_odvod_platba od on(od.id_poistenca = po.id_poistenca) 
+    group by m.n_mesta, o.rod_cislo)
+where rn <= ceil(0.05 * (SELECT COUNT(DISTINCT rod_cislo) 
+                            FROM p_mesto JOIN p_osoba USING (PSC) 
+                            JOIN p_poistenie USING (rod_cislo) 
+                            JOIN p_odvod_platba USING (id_poistenca) 
+                            WHERE n_mesta = mesto));
+                            
+                            
+-- vypÌöte zoznam aktu·lnych drûiteæov ZTP, ktorÌ poËas platnosti preukazu 
+-- nedostali ûiaden prÌspevok. Pouûite EXISTS
+
+select 
+    * 
+from p_ztp z
+where not exists(select 'x' 
+                    from p_poberatel po
+                    join p_prispevky pr on (po.id_poberatela = pr.id_poberatela)
+                    where po.rod_cislo = z.rod_cislo
+                    and
+                    pr.kedy between z.dat_od and dat_do);
+
+
+
+
+-- dopniù do XML group by 
+select xmlroot(xmlelement("osoba",xmlAttributes(rod_cislo as "RC"),
+            xmlelement("meno", meno),
+                    xmlelement("proezvisko", priezvisko),
+            xmlelement("priznane_ztp",
+                xmlagg(
+                    xmlelement("ztp", xmlAttributes(id_ztp as "id"), nazov_postihnutia)
+                    )
+                    )
+                    ), version '1.0')
+from p_osoba left join p_ztp using(rod_cislo) join p_typ_postihnutia using(id_postihnutia)
+having count(distinct id_postihnutia) >1
+group by rod_cislo, meno, priezvisko; -- ide tam vöetko okrem stÂpcov v XMLAGG
+
+
+
+create table tab1 ( id integer not null primary key,
+poznamka varchar2(20) );
+
+create table tab2 ( id integer not null primary key,
+cislo_fk integer not null );
+
+create table tab3 ( id integer not null primary key,
+fk_tab2 integer);
+
+alter table tab2 add foreign key (cislo_fk) references tab1 (id);
+
+alter table tab3 add foreign key (fk_tab2) references tab2 (id);
+
+insert into tab3 values(4,3);
+insert into tab1 values(2,'poznamka');
+insert into tab2 values(3,2);
+
+rollback;
+
+
+select 'insert into p_osoba values(''' || rod_cislo || ''','''
+                                        || meno || ''','''
+                                        || priezvisko || ''','''
+                                        || psc || ''','''
+                                        || ulica || ''');'
+                                        from os_udaje;
+
+
+select * from tab1;
+
+
+create or replace type t_osoba3 as object (
+    id integer,
+    map member function tried return integer
+) not final; 
+/
+
+-- definicia tela procedury 
+create or replace type body t_osoba3 as
+map member function tried return integer
+as
+    begin
+        return 5;
+    end;
+end;
+/
+
+create table osoba21 (
+    osoba t_osoba3
+);
+/
+
+insert into osoba21 values(t_osoba3(1));
+insert into osoba21 values(t_osoba3(2));
+insert into osoba21 values(t_osoba3(3));
+
+select * from osoba21 o order by o.osoba.tried;
+select o.osoba.id from osoba21 o order by osoba;
+
+select value(o) from osoba21 o;
+select * from osoba21 os order by value(os);
+
+
+
+
+-- fragmentujte rel·ciu p_odvod_platby na odvody zaplatnÈ
+-- samoplatcami a odvody zamestnancov 
+
+define fragment frag1 as
+select 
+     sum(od.suma)
+from p_odvod_platba od
+join p_poistenie p on(p.id_poistenca = od.id_poistenca)
+join p_osoba o on(o.rod_cislo = p.rod_cislo)
+where o.rod_cislo = p.id_platitela;
+
+
+define fragment frag2 as
+select 
+     sum(od.suma)
+from p_odvod_platba od
+join p_poistenie p on(p.id_poistenca = od.id_poistenca)
+join p_osoba o on(o.rod_cislo = p.rod_cislo)
+where o.rod_cislo <> p.id_platitela;
+
+
+
+select
+    t.nazov_postihnutia,
+    count(z.id_ztp)
+from p_ztp z
+join p_typ_postihnutia t on (z.id_postihnutia = t.id_postihnutia)
+group by t.nazov_postihnutia, t.id_postihnutia
+order by t.id_postihnutia;
+
+
+select
+    sum(case when t.id_postihnutia = 1 then 1 else 0 end) p1,
+    sum(case when t.id_postihnutia = 2 then 1 else 0 end) p2,
+    sum(case when t.id_postihnutia = 3 then 1 else 0 end) p3,
+    sum(case when t.id_postihnutia = 4 then 1 else 0 end) p4,
+    sum(case when t.id_postihnutia = 5 then 1 else 0 end) p5,
+    sum(case when t.id_postihnutia = 6 then 1 else 0 end) p6
+from p_ztp z
+join p_typ_postihnutia t on (z.id_postihnutia = t.id_postihnutia);

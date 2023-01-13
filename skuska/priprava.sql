@@ -491,13 +491,11 @@ join p_typ_postihnutia t on (z.id_postihnutia = t.id_postihnutia)
 group by t.nazov_postihnutia, t.id_postihnutia
 order by t.id_postihnutia;
 
+drop table osoby;
 
-select
-    sum(case when t.id_postihnutia = 1 then 1 else 0 end) p1,
-    sum(case when t.id_postihnutia = 2 then 1 else 0 end) p2,
-    sum(case when t.id_postihnutia = 3 then 1 else 0 end) p3,
-    sum(case when t.id_postihnutia = 4 then 1 else 0 end) p4,
-    sum(case when t.id_postihnutia = 5 then 1 else 0 end) p5,
-    sum(case when t.id_postihnutia = 6 then 1 else 0 end) p6
-from p_ztp z
-join p_typ_postihnutia t on (z.id_postihnutia = t.id_postihnutia);
+create table osoby of t_osoba;
+
+insert into osoba values (t_osoba(12, 'Jakub', 'h', t_adresa('12345', 'vysokoskolakov' , 'Zilina')));
+insert into osoba values (t_osoba(555, 'Jakub', 'h', t_adresa('12345', 'vysokoskolakov' , 'Zilina')));
+
+select * from osoby o order by value(o);

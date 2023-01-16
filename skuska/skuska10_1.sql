@@ -146,13 +146,31 @@ end;
 -- vytvorte XML nasledujúceho formátu - poberatelia, ktorí dostali 
 -- doteraz celkova aspoò 1000€
 /*
-<mesto nazov='Nazov'>
+<mesto n_mesta='Nazov'>
 <osoby>
     <clovek>Michal Kvet</clovek>
     <clovek>Marak Kvet</clovek>
 </osoby>
 </mesto>
 */
+
+--select extract(value(e), '//osoby/[1]') from (
+create table xml_osoba of xmltype;
+drop table xml_osoba;
+
+insert into xml_osoba( 
+select 
+    XMLRoot(XMLAGG(
+                XMLElement("mesto", XMLAttributes(m.n_mesta as "n_mesta"),
+                XMLElement("osoby",
+                                XMLAGG(XMLElement("clovek", o.meno || ' ' || o.priezvisko)
+                                )
+                            )
+                    )
+        ), version '1.0' ) as vysledok
+from p_mesto m
+join p_osoba o on(o.psc = m.psc)
+group by m.n_mesta);
 
 
 -- vypíšte ICO a názvy všetkıch zamestnávate¾ov z mesta ilina.
@@ -189,4 +207,67 @@ update table(
 ) inner_t 
 set historia.suma = 700
 where historia.suma = 500;
+
+
+
+drop table pom;
+create table pom(id integer);
+
+set autocommit on;
+create or replace procedure proc_vloz2
+is
+ PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+    for i in 1..10
+    loop
+        insert into pom values(i); -- toto sa nevykoná, lebo potom je rollback
+        --proc_vloz(2); -- toto sa vykoná vdy úspešne 
+    end loop;
+end;
+/
+
+exec proc_vloz2;
+select * from pom;
+
+
+
+
+-- vypíšte nasledovnú štatistiku. K jednotlivım typom postihnutí vypíštepoèty ien, 
+-- ktoré zaèali v roku 2018 trpi danou chorobou. riešenie pripravde pre 
+-- kadı tıdeò prvého mesiaca
+
+select
+    t.nazov_postihnutia choroba,
+    count(case when extract(day from z.dat.od) < 8 then 1 else 0 end) 1_t,
+    count(case when extract(day from z.dat.od) < 15 then 1 else 0 end) 2_t,
+    count(case when extract(day from z.dat.od) < 22 then 1 else 0 end) 3_t,
+    count(case when extract(day from z.dat.od) < 29 then 1 else 0 end) 4_t
+from p_mesto m
+join p_osoba o on(o.psc = m.psc)
+join p_ztp z on (z.rod_cislo = o.rod_cislo)
+join p_typ_postihnutia t on (t.id_postihnutia = z.id_postihnutia)
+where substr(rod_cislo,3,2) > 12
+and
+extract(year from z.dat.od) = 2018
+and 
+extract(month from z.dat.od) = 1
+group by t.nazov_postihnutia;
+
+
+-- ku kadej osoby vypíšte meno, priezvisko a celkovú sumu, ktorú zaplatila za 
+-- minulı kaledarnı rok. Ak osoba nezaplatila niè, vypíšte aspoò jej meno
+
+select
+    o.meno,
+    o.priezvisko,
+    sum(od.suma) suma
+from p_osoba o
+join p_poistenie p on (o.rod_cislo = p.rod_cislo)
+full join p_odvod_platba od on(od.id_poistenca = p.id_poistenca)
+where extract(year from od.dat_platby) = extract(year from sysdate) - 7
+group by o.meno, o.priezvisko
+order by suma;
+
+
+
 

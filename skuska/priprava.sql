@@ -499,3 +499,40 @@ insert into osoba values (t_osoba(12, 'Jakub', 'h', t_adresa('12345', 'vysokosko
 insert into osoba values (t_osoba(555, 'Jakub', 'h', t_adresa('12345', 'vysokoskolakov' , 'Zilina')));
 
 select * from osoby o order by value(o);
+
+
+
+
+select
+    o.meno,
+    o.priezvisko,
+    sum(od.suma) suma
+from p_osoba o
+join p_poistenie p on (o.rod_cislo = p.rod_cislo)
+left join p_odvod_platba od (od.id_poistenca = p.id_poistenca)
+where extract(year from od.dat_platby) = extract(year from sysdate) - 1;
+
+
+
+--
+insert into xml_osoba( 
+select 
+XMLRoot(
+    XMLElement("osoby", 
+                    XMLAGG(
+                        XMLElement("osoba", XMLAttributes(rod_cislo as "rc"),
+                        XMLForest(meno as "meno",
+                                    priezvisko as "priezvisko",
+                                    dat as "datum_narodenia"
+                                    )
+                                )
+                       )     
+                ), version '1.0' ) as vysledok
+from (select meno, priezvisko, rod_cislo, 
+                to_date(substr(rod_cislo,5,2) || '.' ||
+                    mod(substr(rod_cislo,3,2),50) || '.' ||
+                    substr(rod_cislo,1,2), 'DD.MM.RR') dat
+        from os_udaje));/
+        
+select * from xml_osoba;
+select extract(value(o), '//osoba[1]') from xml_osoba o;
